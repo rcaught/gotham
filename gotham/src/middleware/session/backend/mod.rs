@@ -1,4 +1,5 @@
 pub(super) mod memory;
+pub(super) mod redis;
 
 use std::io;
 use std::panic::RefUnwindSafe;
@@ -6,6 +7,7 @@ use std::panic::RefUnwindSafe;
 use futures::Future;
 
 use middleware::session::{SessionError, SessionIdentifier};
+use state::{self, FromState, State, StateData};
 
 /// A type which is used to spawn new `Backend` values.
 pub trait NewBackend: Sync + Clone + RefUnwindSafe {
@@ -36,7 +38,7 @@ pub trait Backend {
     /// The returned future will resolve to an `Option<Vec<u8>>` on success, where a value of
     /// `None` indicates that the session is not available for use and a new session should be
     /// established.
-    fn read_session(&self, identifier: SessionIdentifier) -> Box<SessionFuture>;
+    fn read_session(&self, identifier: SessionIdentifier, state: &State) -> Box<SessionFuture>;
 
     /// Drops a session from the underlying storage.
     fn drop_session(&self, identifier: SessionIdentifier) -> Result<(), SessionError>;

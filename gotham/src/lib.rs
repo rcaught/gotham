@@ -39,6 +39,8 @@ extern crate uuid;
 #[macro_use]
 extern crate serde_derive;
 
+extern crate redis;
+
 pub mod extractor;
 pub mod handler;
 pub mod helpers;

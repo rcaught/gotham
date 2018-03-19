@@ -3,35 +3,24 @@ use std::time::{Duration, Instant};
 use std::{io, thread};
 
 use linked_hash_map::LinkedHashMap;
-use futures::future;
+use futures::{future, Future};
 
 use middleware::session::{SessionError, SessionIdentifier};
 use middleware::session::backend::{Backend, NewBackend, SessionFuture};
+use redis;
+
+use tokio_core::reactor::Handle;
+// use redis_async::client;
+
 use state::{self, FromState, State, StateData};
 
 /// Defines the in-process memory based session storage.
 ///
 /// This is the default implementation which is used by `NewSessionMiddleware::default()`
 #[derive(Clone)]
-pub struct MemoryBackend {
-    // Intuitively, a global `Mutex<_>` sounded like the slowest option. However, in some
-    // benchmarking it proved to be the faster out of the options that were tried:
-    //
-    // 1. Background thread containing all data, acting as an internal "server" for session data,
-    //    passing messages via `std::sync::mpsc::sync_channel`;
-    // 2. Background thread maintaining only LRU data for each session ID, and purging them when
-    //    they exceed the TTL, passing messages via a `std::sync::mpsc::sync_channel`;
-    // 3. The same options, but with messages being passed via `crossbeam::sync::MsQueue`;
-    // 4. Naive, global mutex.
-    //
-    // The performance was about 10~15% higher with the naive implementation, when measured in a
-    // similarly naive benchmark using `wrk` and a lightweight sample app. Real-world use cases
-    // might show a need to replace this with a smarter implementation, but today there's very
-    // little overhead here.
-    storage: Arc<Mutex<LinkedHashMap<String, (Instant, Vec<u8>)>>>,
-}
+pub struct RedisBackend {}
 
-impl MemoryBackend {
+impl RedisBackend {
     /// Creates a new `MemoryBackend` where sessions expire and are removed after the `ttl` has
     /// elapsed.
     ///
@@ -47,74 +36,52 @@ impl MemoryBackend {
     /// NewSessionMiddleware::new(MemoryBackend::new(Duration::from_secs(3600)))
     /// # ;}
     /// ```
-    pub fn new(ttl: Duration) -> MemoryBackend {
-        let storage = Arc::new(Mutex::new(LinkedHashMap::new()));
-
-        {
-            let storage = Arc::downgrade(&storage);
-            thread::spawn(move || cleanup_loop(storage, ttl));
-        }
-
-        MemoryBackend { storage }
+    // pub fn new(handle: &Handle) -> RedisBackend {
+    pub fn new() -> RedisBackend {
+        RedisBackend {}
     }
 }
 
-impl Default for MemoryBackend {
-    fn default() -> MemoryBackend {
-        MemoryBackend::new(Duration::from_secs(3600))
+impl Default for RedisBackend {
+    fn default() -> RedisBackend {
+        RedisBackend::new()
     }
 }
 
-impl NewBackend for MemoryBackend {
-    type Instance = MemoryBackend;
+impl NewBackend for RedisBackend {
+    type Instance = RedisBackend;
 
     fn new_backend(&self) -> io::Result<Self::Instance> {
         Ok(self.clone())
     }
 }
 
-impl Backend for MemoryBackend {
+impl Backend for RedisBackend {
     fn persist_session(
         &self,
         identifier: SessionIdentifier,
         content: &[u8],
     ) -> Result<(), SessionError> {
-        match self.storage.lock() {
-            Ok(mut storage) => {
-                storage.insert(identifier.value, (Instant::now(), Vec::from(content)));
-                Ok(())
-            }
-            Err(PoisonError { .. }) => {
-                unreachable!("session memory backend lock poisoned, HashMap panicked?")
-            }
-        }
+        Ok(())
     }
 
-    fn read_session(&self, identifier: SessionIdentifier, _state: &State) -> Box<SessionFuture> {
-        match self.storage.lock() {
-            Ok(mut storage) => match storage.get_refresh(&identifier.value) {
-                Some(&mut (ref mut instant, ref value)) => {
-                    *instant = Instant::now();
-                    Box::new(future::ok(Some(value.clone())))
-                }
-                None => Box::new(future::ok(None)),
-            },
-            Err(PoisonError { .. }) => {
-                unreachable!("session memory backend lock poisoned, HashMap panicked?")
-            }
-        }
+    fn read_session(&self, identifier: SessionIdentifier, state: &State) -> Box<SessionFuture> {
+        let client = redis::Client::open("redis://127.0.0.1:6379").unwrap();
+        let connect = client.get_async_connection(Handle::borrow_from(state));
+
+        let a = redis::cmd("GET").arg(identifier.value).query_async(connect);
+        // Handle::borrow_from(&state).spawn(a);
+        // Handle::borrow_from(&state).spawn(
+        //     connect.and_then(|conn| {
+        //         redis::cmd("GET").arg(identifier.value).query_async(conn)
+        //     })
+        // );
+
+        Box::new(future::ok(None))
     }
 
     fn drop_session(&self, identifier: SessionIdentifier) -> Result<(), SessionError> {
-        match self.storage.lock() {
-            Ok(mut storage) => {
-                storage.remove(&identifier.value);
-                Ok(())
-            }
-            Err(PoisonError { .. }) => {
-                unreachable!("session memory backend lock poisoned, HashMap panicked?")
-            }
-        }
+        Ok(())
     }
 }
 

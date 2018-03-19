@@ -25,6 +25,7 @@ mod rng;
 
 pub use self::backend::{Backend, NewBackend};
 pub use self::backend::memory::MemoryBackend;
+pub use self::backend::redis::RedisBackend;
 
 const SECURE_COOKIE_PREFIX: &'static str = "__Secure-";
 const HOST_COOKIE_PREFIX: &'static str = "__Host-";
@@ -815,7 +816,7 @@ where
                 );
 
                 let f = self.backend
-                    .read_session(id.clone())
+                    .read_session(id.clone(), &state)
                     .then(move |r| self.load_session_into_state(state, id, r))
                     .and_then(|state| chain(state))
                     .and_then(persist_session::<T>);
