@@ -69,15 +69,22 @@ impl Backend for RedisBackend {
         let client = redis::Client::open("redis://127.0.0.1:6379").unwrap();
         let connect = client.get_async_connection(Handle::borrow_from(state));
 
-        let a = redis::cmd("GET").arg(identifier.value).query_async(connect);
-        // Handle::borrow_from(&state).spawn(a);
-        // Handle::borrow_from(&state).spawn(
-        //     connect.and_then(|conn| {
-        //         redis::cmd("GET").arg(identifier.value).query_async(conn)
-        //     })
-        // );
+        let a = connect.and_then(|conn| {
+            redis::cmd("GET")
+                .arg(identifier.value)
+                .query_async::<_, String>(conn)
+        });
 
-        Box::new(future::ok(None))
+        // Box::new(a)
+        // match a {
+        //     Some(value) => Box::new(future::ok(None)),
+        //     None => Box::new(future::ok(None))
+        // }
+
+        // Box::new(future::ok(None))
+
+        // a.then(|result|
+        //     result)
     }
 
     fn drop_session(&self, identifier: SessionIdentifier) -> Result<(), SessionError> {
