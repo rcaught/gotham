@@ -2,11 +2,11 @@ use std::sync::{Arc, Mutex, PoisonError, Weak};
 use std::time::{Duration, Instant};
 use std::{io, thread};
 
-use linked_hash_map::LinkedHashMap;
 use futures::{future, Future};
+use linked_hash_map::LinkedHashMap;
 
-use middleware::session::{SessionError, SessionIdentifier};
 use middleware::session::backend::{Backend, NewBackend, SessionFuture};
+use middleware::session::{SessionError, SessionIdentifier};
 use redis;
 
 use tokio_core::reactor::Handle;
@@ -62,6 +62,7 @@ impl Backend for RedisBackend {
         identifier: SessionIdentifier,
         content: &[u8],
     ) -> Result<(), SessionError> {
+        // Future type that returns where item is unit
         Ok(())
     }
 
@@ -69,25 +70,16 @@ impl Backend for RedisBackend {
         let client = redis::Client::open("redis://127.0.0.1:6379").unwrap();
         let connect = client.get_async_connection(Handle::borrow_from(state));
 
-        let a = connect.and_then(|conn| {
-            redis::cmd("GET")
-                .arg(identifier.value)
-                .query_async::<_, String>(conn)
-        });
-
-        // Box::new(a)
-        // match a {
-        //     Some(value) => Box::new(future::ok(None)),
-        //     None => Box::new(future::ok(None))
-        // }
-
-        // Box::new(future::ok(None))
-
-        // a.then(|result|
-        //     result)
+        Box::new(
+            connect
+                .and_then(|conn| redis::cmd("GET").arg(identifier.value).query_async(conn))
+                .map(|(_, val)| val)
+                .map_err(|_| SessionError::Backend("cheese".to_owned())),
+        )
     }
 
     fn drop_session(&self, identifier: SessionIdentifier) -> Result<(), SessionError> {
+        // Future type that returns where item is unit
         Ok(())
     }
 }
