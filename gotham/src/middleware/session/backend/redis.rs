@@ -1,16 +1,13 @@
-use std::sync::{Arc, Mutex, PoisonError, Weak};
-use std::time::{Duration, Instant};
-use std::{io, thread};
+use std::io;
+use std::time::Duration;
 
 use futures::{future, Future};
-use linked_hash_map::LinkedHashMap;
 
-use middleware::session::backend::{Backend, NewBackend, SessionFuture};
+use middleware::session::backend::{Backend, NewBackend, SessionFuture, SessionUnitFuture};
 use middleware::session::{SessionError, SessionIdentifier};
 use redis;
 
 use tokio_core::reactor::Handle;
-// use redis_async::client;
 
 use state::{self, FromState, State, StateData};
 
@@ -18,7 +15,10 @@ use state::{self, FromState, State, StateData};
 ///
 /// This is the default implementation which is used by `NewSessionMiddleware::default()`
 #[derive(Clone)]
-pub struct RedisBackend {}
+pub struct RedisBackend {
+    url: String,
+    ttl: Duration,
+}
 
 impl RedisBackend {
     /// Creates a new `MemoryBackend` where sessions expire and are removed after the `ttl` has
@@ -37,14 +37,17 @@ impl RedisBackend {
     /// # ;}
     /// ```
     // pub fn new(handle: &Handle) -> RedisBackend {
-    pub fn new() -> RedisBackend {
-        RedisBackend {}
+    pub fn new(url: String, ttl: Duration) -> RedisBackend {
+        RedisBackend { url, ttl }
     }
 }
 
 impl Default for RedisBackend {
     fn default() -> RedisBackend {
-        RedisBackend::new()
+        RedisBackend::new(
+            "redis://127.0.0.1:6379".to_owned(),
+            Duration::from_secs(3600),
+        )
     }
 }
 
@@ -60,14 +63,28 @@ impl Backend for RedisBackend {
     fn persist_session(
         &self,
         identifier: SessionIdentifier,
-        content: &[u8],
-    ) -> Result<(), SessionError> {
-        // Future type that returns where item is unit
-        Ok(())
+        content: &'static [u8],
+        state: &State,
+    ) -> Box<SessionUnitFuture> {
+        let client = redis::Client::open(self.url.as_ref()).unwrap();
+        let connect = client.get_async_connection(Handle::borrow_from(state));
+
+        Box::new(
+            connect
+                .and_then(|conn| {
+                    redis::cmd("SETEX")
+                        .arg(identifier.value)
+                        .arg(Vec::from(content))
+                        .arg(self.ttl.as_secs())
+                        .query_async(conn)
+                })
+                .map(|(_, val)| val)
+                .map_err(|_| SessionError::Backend("cheese".to_owned())),
+        )
     }
 
     fn read_session(&self, identifier: SessionIdentifier, state: &State) -> Box<SessionFuture> {
-        let client = redis::Client::open("redis://127.0.0.1:6379").unwrap();
+        let client = redis::Client::open(self.url.as_ref()).unwrap();
         let connect = client.get_async_connection(Handle::borrow_from(state));
 
         Box::new(
@@ -78,9 +95,16 @@ impl Backend for RedisBackend {
         )
     }
 
-    fn drop_session(&self, identifier: SessionIdentifier) -> Result<(), SessionError> {
-        // Future type that returns where item is unit
-        Ok(())
+    fn drop_session(&self, identifier: SessionIdentifier, state: &State) -> Box<SessionUnitFuture> {
+        let client = redis::Client::open(self.url.as_ref()).unwrap();
+        let connect = client.get_async_connection(Handle::borrow_from(state));
+
+        Box::new(
+            connect
+                .and_then(|conn| redis::cmd("DEL").arg(identifier.value).query_async(conn))
+                .map(|(_, val)| val)
+                .map_err(|_| SessionError::Backend("cheese".to_owned())),
+        )
     }
 }
 
@@ -116,8 +140,8 @@ mod tests {
     }
 
     #[test]
-    fn memory_backend_test() {
-        let new_backend = MemoryBackend::new(Duration::from_millis(100));
+    fn redis_backend_test() {
+        let new_backend = RedisBackend::new("".to_owned(), Duration::from_seconds(1));
         let bytes: Vec<u8> = (0..64).map(|_| rand::random()).collect();
         let identifier = SessionIdentifier {
             value: "totally_random_identifier".to_owned(),

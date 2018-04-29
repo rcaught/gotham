@@ -1,31 +1,31 @@
 //! Defines a session middleware with a pluggable backend.
 
 use std::io;
-use std::sync::{Arc, Mutex, PoisonError};
-use std::ops::{Deref, DerefMut};
 use std::marker::PhantomData;
+use std::ops::{Deref, DerefMut};
 use std::panic::RefUnwindSafe;
+use std::sync::{Arc, Mutex, PoisonError};
 
 use base64;
-use rand::Rng;
-use hyper::StatusCode;
-use hyper::server::Response;
-use hyper::header::{Cookie, Headers, SetCookie};
-use futures::{future, Future};
-use serde::{Deserialize, Serialize};
 use bincode;
+use futures::{future, Future};
+use hyper::StatusCode;
+use hyper::header::{Cookie, Headers, SetCookie};
+use hyper::server::Response;
+use rand::Rng;
+use serde::{Deserialize, Serialize};
 
 use super::{Middleware, NewMiddleware};
 use handler::{HandlerError, HandlerFuture, IntoHandlerError};
-use state::{self, FromState, State, StateData};
 use helpers::http::response::create_response;
+use state::{self, FromState, State, StateData};
 
 mod backend;
 mod rng;
 
-pub use self::backend::{Backend, NewBackend};
 pub use self::backend::memory::MemoryBackend;
 pub use self::backend::redis::RedisBackend;
+pub use self::backend::{Backend, NewBackend, SessionUnitFuture};
 
 const SECURE_COOKIE_PREFIX: &'static str = "__Secure-";
 const HOST_COOKIE_PREFIX: &'static str = "__Host-";
@@ -287,11 +287,11 @@ where
     /// Discards the session, invalidating it for future use and removing the data from the
     /// `Backend`.
     // TODO: Add test case that covers this.
-    pub fn discard(self, state: &mut State) -> Result<(), SessionError> {
+    pub fn discard(self, state: &mut State) -> Box<SessionUnitFuture> {
         state.put(SessionDropData {
             cookie_config: self.cookie_config,
         });
-        self.backend.drop_session(self.identifier)
+        self.backend.drop_session(self.identifier, state)
     }
 
     // Create a new, blank `SessionData<T>`
@@ -955,23 +955,24 @@ where
 
     let result = session_data
         .backend
-        .persist_session(identifier.clone(), slice);
+        .persist_session(identifier.clone(), slice.clone(), &state);
 
-    match result {
-        Ok(_) => {
-            trace!(
-                "[{}] persisted session ({}) successfully",
-                state::request_id(&state),
-                identifier.value
-            );
+    // match result.deref() {
+    //     // Ok(_) => {
+    //     //     trace!(
+    //     //         "[{}] persisted session ({}) successfully",
+    //     //         state::request_id(&state),
+    //     //         identifier.value
+    //     //     );
 
-            future::ok((state, response))
-        }
-        Err(_) => {
-            let response = create_response(&state, StatusCode::InternalServerError, None);
-            return future::ok((state, response));
-        }
-    }
+    //     //     future::ok((state, response))
+    //     // }
+    //     // Err(_) => {
+    //     //     let response = create_response(&state, StatusCode::InternalServerError, None);
+    //     //     return future::ok((state, response));
+    //     // }
+    // }
+    future::ok((state, response))
 }
 
 impl<B, T> SessionMiddleware<B, T>
@@ -1035,11 +1036,11 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use hyper::header::Headers;
+    use hyper::{Response, StatusCode};
+    use rand;
     use std::sync::Mutex;
     use std::time::Duration;
-    use rand;
-    use hyper::{Response, StatusCode};
-    use hyper::header::Headers;
 
     #[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
     struct TestSession {

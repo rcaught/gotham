@@ -2,11 +2,11 @@ use std::sync::{Arc, Mutex, PoisonError, Weak};
 use std::time::{Duration, Instant};
 use std::{io, thread};
 
-use linked_hash_map::LinkedHashMap;
 use futures::future;
+use linked_hash_map::LinkedHashMap;
 
+use middleware::session::backend::{Backend, NewBackend, SessionFuture, SessionUnitFuture};
 use middleware::session::{SessionError, SessionIdentifier};
-use middleware::session::backend::{Backend, NewBackend, SessionFuture};
 use state::{self, FromState, State, StateData};
 
 /// Defines the in-process memory based session storage.
@@ -78,11 +78,12 @@ impl Backend for MemoryBackend {
         &self,
         identifier: SessionIdentifier,
         content: &[u8],
-    ) -> Result<(), SessionError> {
+        state: &State,
+    ) -> Box<SessionUnitFuture> {
         match self.storage.lock() {
             Ok(mut storage) => {
                 storage.insert(identifier.value, (Instant::now(), Vec::from(content)));
-                Ok(())
+                Box::new(future::ok(()))
             }
             Err(PoisonError { .. }) => {
                 unreachable!("session memory backend lock poisoned, HashMap panicked?")
@@ -105,11 +106,11 @@ impl Backend for MemoryBackend {
         }
     }
 
-    fn drop_session(&self, identifier: SessionIdentifier) -> Result<(), SessionError> {
+    fn drop_session(&self, identifier: SessionIdentifier, state: &State) -> Box<SessionUnitFuture> {
         match self.storage.lock() {
             Ok(mut storage) => {
                 storage.remove(&identifier.value);
-                Ok(())
+                Box::new(future::ok(()))
             }
             Err(PoisonError { .. }) => {
                 unreachable!("session memory backend lock poisoned, HashMap panicked?")

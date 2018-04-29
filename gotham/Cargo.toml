@@ -31,7 +31,7 @@ linked-hash-map = "0.5"
 num_cpus = "1.2"
 crossbeam = "0.3"
 regex = "1.0"
-redis = { git = "https://github.com/Marwes/redis-rs", branch = "async" }
+redis = { git = "https://github.com/Marwes/redis-rs", rev = "ed4af1e8c16fbae8aeb4873204cd0f03a6b24586" }
 
 [dev-dependencies]
 gotham_derive = { path = "../gotham_derive" }
