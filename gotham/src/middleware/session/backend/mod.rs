@@ -7,7 +7,7 @@ use std::panic::RefUnwindSafe;
 use futures::Future;
 
 use middleware::session::{SessionError, SessionIdentifier};
-use state::{self, FromState, State, StateData};
+use state::State;
 
 /// A type which is used to spawn new `Backend` values.
 pub trait NewBackend: Sync + Clone + RefUnwindSafe {

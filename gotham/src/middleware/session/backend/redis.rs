@@ -1,7 +1,7 @@
 use std::io;
 use std::time::Duration;
 
-use futures::{future, Future};
+use futures::Future;
 
 use middleware::session::backend::{Backend, NewBackend, SessionFuture, SessionUnitFuture};
 use middleware::session::{SessionError, SessionIdentifier};
@@ -9,7 +9,7 @@ use redis;
 
 use tokio_core::reactor::Handle;
 
-use state::{self, FromState, State, StateData};
+use state::{FromState, State};
 
 /// Defines the in-process memory based session storage.
 ///

@@ -1165,7 +1165,7 @@ mod tests {
         let bytes = bincode::serialize(&session).unwrap();
 
         m.backend
-            .persist_session(identifier.clone(), &bytes)
+            .persist_session(identifier.clone(), Vec::from(&bytes[..]))
             .unwrap();
 
         let mut cookies = Cookie::new();
