@@ -951,11 +951,11 @@ where
     };
 
     let identifier = session_data.identifier;
-    let slice = &bytes[..];
 
-    let result = session_data
-        .backend
-        .persist_session(identifier.clone(), slice.clone(), &state);
+    let result =
+        session_data
+            .backend
+            .persist_session(identifier.clone(), Vec::from(&bytes[..]), &state);
 
     // match result.deref() {
     //     // Ok(_) => {

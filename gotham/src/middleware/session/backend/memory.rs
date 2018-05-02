@@ -77,7 +77,7 @@ impl Backend for MemoryBackend {
     fn persist_session(
         &self,
         identifier: SessionIdentifier,
-        content: &[u8],
+        content: Vec<u8>,
         state: &State,
     ) -> Box<SessionUnitFuture> {
         match self.storage.lock() {

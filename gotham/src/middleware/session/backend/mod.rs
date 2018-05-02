@@ -22,7 +22,7 @@ pub trait NewBackend: Sync + Clone + RefUnwindSafe {
 pub type SessionFuture = Future<Item = Option<Vec<u8>>, Error = SessionError>;
 
 /// Type alias for the trait objects returned by `Backend`.
-pub type SessionUnitFuture = Future<Item = (), Error = SessionError> + 'static;
+pub type SessionUnitFuture = Future<Item = (), Error = SessionError>;
 
 /// A `Backend` receives session data and stores it, and recalls the session data subsequently.
 ///
@@ -33,7 +33,7 @@ pub trait Backend {
     fn persist_session(
         &self,
         identifier: SessionIdentifier,
-        content: &'static [u8],
+        content: Vec<u8>,
         state: &State,
     ) -> Box<SessionUnitFuture>;
 

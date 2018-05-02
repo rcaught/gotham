@@ -63,7 +63,7 @@ impl Backend for RedisBackend {
     fn persist_session(
         &self,
         identifier: SessionIdentifier,
-        content: &'static [u8],
+        content: Vec<u8>,
         state: &State,
     ) -> Box<SessionUnitFuture> {
         let client = redis::Client::open(self.url.as_ref()).unwrap();
@@ -74,7 +74,7 @@ impl Backend for RedisBackend {
                 .and_then(|conn| {
                     redis::cmd("SETEX")
                         .arg(identifier.value)
-                        .arg(Vec::from(content))
+                        .arg(content)
                         .arg(self.ttl.as_secs())
                         .query_async(conn)
                 })
