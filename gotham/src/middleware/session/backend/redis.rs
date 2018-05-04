@@ -68,14 +68,15 @@ impl Backend for RedisBackend {
     ) -> Box<SessionUnitFuture> {
         let client = redis::Client::open(self.url.as_ref()).unwrap();
         let connect = client.get_async_connection(Handle::borrow_from(state));
+        let ttl = self.ttl;
 
         Box::new(
             connect
-                .and_then(|conn| {
+                .and_then(move |conn| {
                     redis::cmd("SETEX")
                         .arg(identifier.value)
                         .arg(content)
-                        .arg(self.ttl.as_secs())
+                        .arg(ttl.as_secs())
                         .query_async(conn)
                 })
                 .map(|(_, val)| val)
