@@ -77,9 +77,9 @@ impl Backend for RedisBackend {
                         .arg(identifier.value)
                         .arg(content)
                         .arg(ttl.as_secs())
-                        .query_async(conn)
+                        .query_async::<_, Vec<u8>>(conn)
                 })
-                .map(|(_, val)| val)
+                .map(|(_, _)| ())
                 .map_err(|_| SessionError::Backend("cheese".to_owned())),
         )
     }

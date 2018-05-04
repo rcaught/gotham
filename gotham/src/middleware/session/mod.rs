@@ -858,9 +858,7 @@ where
     }
 }
 
-fn persist_session<T>(
-    (mut state, mut response): (State, Response),
-) -> future::FutureResult<(State, Response), (State, HandlerError)>
+fn persist_session<T>((mut state, mut response): (State, Response)) -> Box<HandlerFuture>
 where
     T: Default + Serialize + for<'de> Deserialize<'de> + 'static,
 {
@@ -871,7 +869,7 @@ where
                 state::request_id(&state)
             );
             reset_cookie(&mut response, session_drop_data);
-            return future::ok((state, response));
+            return Box::new(future::ok((state, response)));
         }
         None => {
             trace!(
@@ -889,11 +887,11 @@ where
 
             match session_data.state {
                 SessionDataState::Dirty => write_session(state, response, session_data),
-                SessionDataState::Clean => future::ok((state, response)),
+                SessionDataState::Clean => Box::new(future::ok((state, response))),
             }
         }
         // Session was discarded with `SessionData::discard`, or otherwise removed
-        None => future::ok((state, response)),
+        None => Box::new(future::ok((state, response))),
     }
 }
 
@@ -932,7 +930,7 @@ fn write_session<T>(
     state: State,
     response: Response,
     session_data: SessionData<T>,
-) -> future::FutureResult<(State, Response), (State, HandlerError)>
+) -> Box<HandlerFuture>
 where
     T: Default + Serialize + for<'de> Deserialize<'de> + 'static,
 {
@@ -946,33 +944,32 @@ where
             );
 
             let response = create_response(&state, StatusCode::InternalServerError, None);
-            return future::ok((state, response));
+            return Box::new(future::ok((state, response)));
         }
     };
 
     let identifier = session_data.identifier;
 
-    let result =
+    Box::new(
         session_data
             .backend
-            .persist_session(identifier.clone(), Vec::from(&bytes[..]), &state);
+            .persist_session(identifier.clone(), Vec::from(&bytes[..]), &state)
+            .then(move |result| match result {
+                Ok(_) => {
+                    trace!(
+                        "[{}] persisted session ({}) successfully",
+                        state::request_id(&state),
+                        identifier.value
+                    );
 
-    // match result.deref() {
-    //     // Ok(_) => {
-    //     //     trace!(
-    //     //         "[{}] persisted session ({}) successfully",
-    //     //         state::request_id(&state),
-    //     //         identifier.value
-    //     //     );
-
-    //     //     future::ok((state, response))
-    //     // }
-    //     // Err(_) => {
-    //     //     let response = create_response(&state, StatusCode::InternalServerError, None);
-    //     //     return future::ok((state, response));
-    //     // }
-    // }
-    future::ok((state, response))
+                    future::ok((state, response))
+                }
+                Err(_) => {
+                    let response = create_response(&state, StatusCode::InternalServerError, None);
+                    future::ok((state, response))
+                }
+            }),
+    )
 }
 
 impl<B, T> SessionMiddleware<B, T>
