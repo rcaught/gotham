@@ -1160,9 +1160,10 @@ mod tests {
             val: rand::random(),
         };
         let bytes = bincode::serialize(&session).unwrap();
+        let state = State::new();
 
         m.backend
-            .persist_session(identifier.clone(), Vec::from(&bytes[..]))
+            .persist_session(identifier.clone(), Vec::from(&bytes[..]), &state)
             .unwrap();
 
         let mut cookies = Cookie::new();
@@ -1203,7 +1204,11 @@ mod tests {
         }
 
         let m = nm.new_middleware().unwrap();
-        let bytes = m.backend.read_session(identifier).wait().unwrap().unwrap();
+        let bytes = m.backend
+            .read_session(identifier, &state)
+            .wait()
+            .unwrap()
+            .unwrap();
         let updated = bincode::deserialize::<TestSession>(&bytes[..]).unwrap();
 
         assert_eq!(updated.val, session.val + 1);

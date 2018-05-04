@@ -106,7 +106,11 @@ impl Backend for MemoryBackend {
         }
     }
 
-    fn drop_session(&self, identifier: SessionIdentifier, _state: &State) -> Box<SessionUnitFuture> {
+    fn drop_session(
+        &self,
+        identifier: SessionIdentifier,
+        _state: &State,
+    ) -> Box<SessionUnitFuture> {
         match self.storage.lock() {
             Ok(mut storage) => {
                 storage.remove(&identifier.value);
@@ -224,17 +228,18 @@ mod tests {
         let identifier = SessionIdentifier {
             value: "totally_random_identifier".to_owned(),
         };
+        let state = State::new();
 
         new_backend
             .new_backend()
             .expect("can't create backend for write")
-            .persist_session(identifier.clone(), &bytes[..])
+            .persist_session(identifier.clone(), bytes, &state)
             .expect("failed to persist");
 
         let received = new_backend
             .new_backend()
             .expect("can't create backend for read")
-            .read_session(identifier.clone())
+            .read_session(identifier.clone(), &state)
             .wait()
             .expect("no response from backend")
             .expect("session data missing");
@@ -253,17 +258,18 @@ mod tests {
         let identifier2 = SessionIdentifier {
             value: "another_totally_random_identifier".to_owned(),
         };
+        let state = State::new();
 
         let backend = new_backend
             .new_backend()
             .expect("can't create backend for write");
 
         backend
-            .persist_session(identifier.clone(), &bytes[..])
+            .persist_session(identifier.clone(), bytes, &state)
             .expect("failed to persist");
 
         backend
-            .persist_session(identifier2.clone(), &bytes2[..])
+            .persist_session(identifier2.clone(), bytes2, &state)
             .expect("failed to persist");
 
         {
@@ -280,7 +286,7 @@ mod tests {
         }
 
         backend
-            .read_session(identifier.clone())
+            .read_session(identifier.clone(), &state)
             .wait()
             .expect("failed to read session");
 

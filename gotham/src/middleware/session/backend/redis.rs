@@ -117,47 +117,24 @@ mod tests {
     use rand;
 
     #[test]
-    fn cleanup_test() {
-        let mut storage = LinkedHashMap::new();
-
-        storage.insert(
-            "abcd".to_owned(),
-            (Instant::now() - Duration::from_secs(2), vec![]),
-        );
-
-        cleanup_once(&mut storage, Duration::from_secs(1));
-        assert!(storage.is_empty());
-    }
-
-    #[test]
-    fn cleanup_join_test() {
-        let storage = Arc::new(Mutex::new(LinkedHashMap::new()));
-        let weak = Arc::downgrade(&storage);
-
-        let handle = thread::spawn(move || cleanup_loop(weak, Duration::from_millis(1)));
-
-        drop(storage);
-        handle.join().unwrap();
-    }
-
-    #[test]
     fn redis_backend_test() {
-        let new_backend = RedisBackend::new("".to_owned(), Duration::from_seconds(1));
+        let new_backend = RedisBackend::default();
         let bytes: Vec<u8> = (0..64).map(|_| rand::random()).collect();
         let identifier = SessionIdentifier {
             value: "totally_random_identifier".to_owned(),
         };
+        let state = State::new();
 
         new_backend
             .new_backend()
             .expect("can't create backend for write")
-            .persist_session(identifier.clone(), &bytes[..])
+            .persist_session(identifier.clone(), bytes, &state)
             .expect("failed to persist");
 
         let received = new_backend
             .new_backend()
             .expect("can't create backend for read")
-            .read_session(identifier.clone())
+            .read_session(identifier.clone(), &state)
             .wait()
             .expect("no response from backend")
             .expect("session data missing");
@@ -166,8 +143,8 @@ mod tests {
     }
 
     #[test]
-    fn memory_backend_refresh_test() {
-        let new_backend = MemoryBackend::new(Duration::from_millis(100));
+    fn redis_backend_refresh_test() {
+        let new_backend = RedisBackend::default();
         let bytes: Vec<u8> = (0..64).map(|_| rand::random()).collect();
         let identifier = SessionIdentifier {
             value: "totally_random_identifier".to_owned(),
@@ -176,21 +153,21 @@ mod tests {
         let identifier2 = SessionIdentifier {
             value: "another_totally_random_identifier".to_owned(),
         };
+        let state = State::new();
 
         let backend = new_backend
             .new_backend()
             .expect("can't create backend for write");
 
         backend
-            .persist_session(identifier.clone(), &bytes[..])
+            .persist_session(identifier.clone(), bytes, &state)
             .expect("failed to persist");
 
         backend
-            .persist_session(identifier2.clone(), &bytes2[..])
+            .persist_session(identifier2.clone(), bytes2, &state)
             .expect("failed to persist");
 
         {
-            let mut storage = backend.storage.lock().expect("couldn't lock storage");
             assert_eq!(
                 storage.front().expect("no front element").0,
                 &identifier.value
@@ -203,13 +180,12 @@ mod tests {
         }
 
         backend
-            .read_session(identifier.clone())
+            .read_session(identifier.clone(), &state)
             .wait()
             .expect("failed to read session");
 
         {
             // Identifiers have swapped
-            let mut storage = backend.storage.lock().expect("couldn't lock storage");
             assert_eq!(
                 storage.front().expect("no front element").0,
                 &identifier2.value
