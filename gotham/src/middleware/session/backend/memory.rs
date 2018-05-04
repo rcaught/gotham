@@ -78,7 +78,7 @@ impl Backend for MemoryBackend {
         &self,
         identifier: SessionIdentifier,
         content: Vec<u8>,
-        state: &State,
+        _state: &State,
     ) -> Box<SessionUnitFuture> {
         match self.storage.lock() {
             Ok(mut storage) => {
@@ -106,7 +106,7 @@ impl Backend for MemoryBackend {
         }
     }
 
-    fn drop_session(&self, identifier: SessionIdentifier, state: &State) -> Box<SessionUnitFuture> {
+    fn drop_session(&self, identifier: SessionIdentifier, _state: &State) -> Box<SessionUnitFuture> {
         match self.storage.lock() {
             Ok(mut storage) => {
                 storage.remove(&identifier.value);

@@ -32,6 +32,7 @@ members = [
     # sessions
     "examples/sessions/introduction",
     "examples/sessions/custom_data_type",
+    "examples/sessions/redis_session_backend",
 
     # headers
     "examples/headers/setting",
