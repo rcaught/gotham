@@ -1163,8 +1163,7 @@ mod tests {
         let state = State::new();
 
         m.backend
-            .persist_session(identifier.clone(), Vec::from(&bytes[..]), &state)
-            .unwrap();
+            .persist_session(identifier.clone(), Vec::from(&bytes[..]), &state);
 
         let mut cookies = Cookie::new();
         cookies.set("_gotham_session", identifier.value.clone());

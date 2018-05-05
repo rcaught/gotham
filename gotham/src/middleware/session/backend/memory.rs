@@ -233,8 +233,7 @@ mod tests {
         new_backend
             .new_backend()
             .expect("can't create backend for write")
-            .persist_session(identifier.clone(), bytes, &state)
-            .expect("failed to persist");
+            .persist_session(identifier.clone(), bytes, &state);
 
         let received = new_backend
             .new_backend()
@@ -264,13 +263,9 @@ mod tests {
             .new_backend()
             .expect("can't create backend for write");
 
-        backend
-            .persist_session(identifier.clone(), bytes, &state)
-            .expect("failed to persist");
+        backend.persist_session(identifier.clone(), bytes, &state);
 
-        backend
-            .persist_session(identifier2.clone(), bytes2, &state)
-            .expect("failed to persist");
+        backend.persist_session(identifier2.clone(), bytes2, &state);
 
         {
             let mut storage = backend.storage.lock().expect("couldn't lock storage");
