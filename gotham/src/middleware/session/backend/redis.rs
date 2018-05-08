@@ -77,10 +77,10 @@ impl Backend for RedisBackend {
                         .arg(identifier.value)
                         .arg(content)
                         .arg(ttl.as_secs())
-                        .query_async::<_, Vec<u8>>(conn)
+                        .query_async::<_, u8>(conn)
                 })
                 .map(|(_, _)| ())
-                .map_err(|_| SessionError::Backend("cheese".to_owned())),
+                .map_err(|error| SessionError::Backend(format!("{}", error))),
         )
     }
 
@@ -92,7 +92,7 @@ impl Backend for RedisBackend {
             connect
                 .and_then(|conn| redis::cmd("GET").arg(identifier.value).query_async(conn))
                 .map(|(_, val)| val)
-                .map_err(|_| SessionError::Backend("cheese".to_owned())),
+                .map_err(|error| SessionError::Backend(format!("{}", error))),
         )
     }
 
@@ -104,7 +104,7 @@ impl Backend for RedisBackend {
             connect
                 .and_then(|conn| redis::cmd("DEL").arg(identifier.value).query_async(conn))
                 .map(|(_, val)| val)
-                .map_err(|_| SessionError::Backend("cheese".to_owned())),
+                .map_err(|error| SessionError::Backend(format!("{}", error))),
         )
     }
 }

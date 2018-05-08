@@ -964,7 +964,8 @@ where
 
                     future::ok((state, response))
                 }
-                Err(_) => {
+                Err(error) => {
+                    println!("{:?}", error);
                     let response = create_response(&state, StatusCode::InternalServerError, None);
                     future::ok((state, response))
                 }
