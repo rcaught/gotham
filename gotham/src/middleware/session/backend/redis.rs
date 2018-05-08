@@ -75,9 +75,9 @@ impl Backend for RedisBackend {
                 .and_then(move |conn| {
                     redis::cmd("SETEX")
                         .arg(identifier.value)
-                        .arg(content)
                         .arg(ttl.as_secs())
-                        .query_async::<_, u8>(conn)
+                        .arg(content)
+                        .query_async::<_, ()>(conn)
                 })
                 .map(|(_, _)| ())
                 .map_err(|error| SessionError::Backend(format!("{}", error))),
