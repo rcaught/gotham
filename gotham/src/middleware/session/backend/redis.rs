@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use futures::Future;
 
-use middleware::session::backend::{Backend, NewBackend, SessionFuture, SessionUnitFuture};
+use middleware::session::backend::{Backend, NewBackend, SessionFuture};
 use middleware::session::{SessionError, SessionIdentifier};
 use redis;
 
@@ -62,7 +62,7 @@ impl Backend for RedisBackend {
         identifier: SessionIdentifier,
         content: Vec<u8>,
         state: &State,
-    ) -> Box<SessionUnitFuture> {
+    ) -> Box<SessionFuture> {
         let client = redis::Client::open(self.url.as_ref()).unwrap();
         let connect = client.get_async_connection(Handle::borrow_from(state));
         let ttl = self.ttl;
@@ -76,7 +76,7 @@ impl Backend for RedisBackend {
                         .arg(content)
                         .query_async(conn)
                 })
-                .map(|(_, val)| val)
+                .map(|(_, _)| None)
                 .map_err(|error| SessionError::Backend(format!("{}", error))),
         )
     }
@@ -93,14 +93,14 @@ impl Backend for RedisBackend {
         )
     }
 
-    fn drop_session(&self, identifier: SessionIdentifier, state: &State) -> Box<SessionUnitFuture> {
+    fn drop_session(&self, identifier: SessionIdentifier, state: &State) -> Box<SessionFuture> {
         let client = redis::Client::open(self.url.as_ref()).unwrap();
         let connect = client.get_async_connection(Handle::borrow_from(state));
 
         Box::new(
             connect
                 .and_then(|conn| redis::cmd("DEL").arg(identifier.value).query_async(conn))
-                .map(|(_, val)| val)
+                .map(|(_, _)| None)
                 .map_err(|error| SessionError::Backend(format!("{}", error))),
         )
     }

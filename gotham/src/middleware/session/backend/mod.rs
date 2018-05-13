@@ -21,9 +21,6 @@ pub trait NewBackend: Sync + Clone + RefUnwindSafe {
 /// Type alias for the trait objects returned by `Backend`.
 pub type SessionFuture = Future<Item = Option<Vec<u8>>, Error = SessionError>;
 
-/// Type alias for the trait objects returned by `Backend`.
-pub type SessionUnitFuture = Future<Item = (), Error = SessionError>;
-
 /// A `Backend` receives session data and stores it, and recalls the session data subsequently.
 ///
 /// All session data is serialized into a `Vec<u8>` which is treated as opaque by the backend. The
@@ -35,7 +32,7 @@ pub trait Backend {
         identifier: SessionIdentifier,
         content: Vec<u8>,
         state: &State,
-    ) -> Box<SessionUnitFuture>;
+    ) -> Box<SessionFuture>;
 
     /// Retrieves a session from the underlying storage.
     ///
@@ -45,5 +42,5 @@ pub trait Backend {
     fn read_session(&self, identifier: SessionIdentifier, state: &State) -> Box<SessionFuture>;
 
     /// Drops a session from the underlying storage.
-    fn drop_session(&self, identifier: SessionIdentifier, state: &State) -> Box<SessionUnitFuture>;
+    fn drop_session(&self, identifier: SessionIdentifier, state: &State) -> Box<SessionFuture>;
 }

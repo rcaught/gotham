@@ -6,7 +6,7 @@ use futures::future;
 use linked_hash_map::LinkedHashMap;
 
 use middleware::session::SessionIdentifier;
-use middleware::session::backend::{Backend, NewBackend, SessionFuture, SessionUnitFuture};
+use middleware::session::backend::{Backend, NewBackend, SessionFuture};
 use state::State;
 
 /// Defines the in-process memory based session storage.
@@ -79,11 +79,11 @@ impl Backend for MemoryBackend {
         identifier: SessionIdentifier,
         content: Vec<u8>,
         _state: &State,
-    ) -> Box<SessionUnitFuture> {
+    ) -> Box<SessionFuture> {
         match self.storage.lock() {
             Ok(mut storage) => {
                 storage.insert(identifier.value, (Instant::now(), Vec::from(content)));
-                Box::new(future::ok(()))
+                Box::new(SessionFuture(None))
             }
             Err(PoisonError { .. }) => {
                 unreachable!("session memory backend lock poisoned, HashMap panicked?")
@@ -106,15 +106,11 @@ impl Backend for MemoryBackend {
         }
     }
 
-    fn drop_session(
-        &self,
-        identifier: SessionIdentifier,
-        _state: &State,
-    ) -> Box<SessionUnitFuture> {
+    fn drop_session(&self, identifier: SessionIdentifier, _state: &State) -> Box<SessionFuture> {
         match self.storage.lock() {
             Ok(mut storage) => {
                 storage.remove(&identifier.value);
-                Box::new(future::ok(()))
+                Box::new(None)
             }
             Err(PoisonError { .. }) => {
                 unreachable!("session memory backend lock poisoned, HashMap panicked?")

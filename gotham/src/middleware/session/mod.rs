@@ -25,7 +25,7 @@ mod rng;
 
 pub use self::backend::memory::MemoryBackend;
 pub use self::backend::redis::RedisBackend;
-pub use self::backend::{Backend, NewBackend, SessionUnitFuture};
+pub use self::backend::{Backend, NewBackend, SessionFuture};
 
 const SECURE_COOKIE_PREFIX: &'static str = "__Secure-";
 const HOST_COOKIE_PREFIX: &'static str = "__Host-";
@@ -287,7 +287,7 @@ where
     /// Discards the session, invalidating it for future use and removing the data from the
     /// `Backend`.
     // TODO: Add test case that covers this.
-    pub fn discard(self, state: &mut State) -> Box<SessionUnitFuture> {
+    pub fn discard(self, state: &mut State) -> Box<SessionFuture> {
         state.put(SessionDropData {
             cookie_config: self.cookie_config,
         });
