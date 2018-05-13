@@ -11,9 +11,7 @@ use tokio_core::reactor::Handle;
 
 use state::{FromState, State};
 
-/// Defines the in-process memory based session storage.
-///
-/// This is the default implementation which is used by `NewSessionMiddleware::default()`
+/// Defines the Redis based session storage.
 #[derive(Clone)]
 pub struct RedisBackend {
     url: String,
@@ -21,19 +19,18 @@ pub struct RedisBackend {
 }
 
 impl RedisBackend {
-    /// Creates a new `MemoryBackend` where sessions expire and are removed after the `ttl` has
-    /// elapsed.
+    /// Creates a new `RedisBackend` with a connection `url` and where sessions expire after the `ttl` has elapsed.
     ///
-    /// Alternately, `MemoryBackend::default()` creates a `MemoryBackend` with a `ttl` of one hour.
+    /// Alternately, `RedisBackend::default()` creates a `RedisBackend` with a connection `url` of a local Redis (with a default port) and `ttl` of one hour.
     ///
     /// ## Examples
     ///
     /// ```rust
     /// # extern crate gotham;
     /// # use std::time::Duration;
-    /// # use gotham::middleware::session::{MemoryBackend, NewSessionMiddleware};
+    /// # use gotham::middleware::session::{RedisBackend, NewSessionMiddleware};
     /// # fn main() {
-    /// NewSessionMiddleware::new(MemoryBackend::new(Duration::from_secs(3600)))
+    /// NewSessionMiddleware::new(RedisBackend::new("redis://127.0.0.1:6379".to_owned(), Duration::from_secs(3600)))
     /// # ;}
     /// ```
     // pub fn new(handle: &Handle) -> RedisBackend {
