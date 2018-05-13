@@ -77,9 +77,9 @@ impl Backend for RedisBackend {
                         .arg(identifier.value)
                         .arg(ttl.as_secs())
                         .arg(content)
-                        .query_async::<_, ()>(conn)
+                        .query_async(conn)
                 })
-                .map(|(_, _)| ())
+                .map(|(_, val)| val)
                 .map_err(|error| SessionError::Backend(format!("{}", error))),
         )
     }
