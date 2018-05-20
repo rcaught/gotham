@@ -83,7 +83,7 @@ impl Backend for MemoryBackend {
         match self.storage.lock() {
             Ok(mut storage) => {
                 storage.insert(identifier.value, (Instant::now(), Vec::from(content)));
-                Box::new(SessionFuture(None))
+                Box::new(future::ok(None))
             }
             Err(PoisonError { .. }) => {
                 unreachable!("session memory backend lock poisoned, HashMap panicked?")
@@ -110,7 +110,7 @@ impl Backend for MemoryBackend {
         match self.storage.lock() {
             Ok(mut storage) => {
                 storage.remove(&identifier.value);
-                Box::new(None)
+                Box::new(future::ok(None))
             }
             Err(PoisonError { .. }) => {
                 unreachable!("session memory backend lock poisoned, HashMap panicked?")

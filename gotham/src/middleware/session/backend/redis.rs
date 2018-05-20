@@ -74,7 +74,7 @@ impl Backend for RedisBackend {
                         .arg(identifier.value)
                         .arg(ttl.as_secs())
                         .arg(content)
-                        .query_async(conn)
+                        .query_async::<_, Option<()>>(conn)
                 })
                 .map(|(_, _)| None)
                 .map_err(|error| SessionError::Backend(format!("{}", error))),
@@ -99,7 +99,11 @@ impl Backend for RedisBackend {
 
         Box::new(
             connect
-                .and_then(|conn| redis::cmd("DEL").arg(identifier.value).query_async(conn))
+                .and_then(|conn| {
+                    redis::cmd("DEL")
+                        .arg(identifier.value)
+                        .query_async::<_, Option<()>>(conn)
+                })
                 .map(|(_, _)| None)
                 .map_err(|error| SessionError::Backend(format!("{}", error))),
         )
